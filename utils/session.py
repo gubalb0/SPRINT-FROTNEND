@@ -123,8 +123,8 @@ def gerar_historico(eq, horas=24, intervalo_min=10):
 
         noise = lambda v, p: v * (1 + random.gauss(0, p))
 
-        temp   = noise(68 * drift, 0.03)
-        vibracao = noise(1.2 * drift, 0.08)
+        temp   = noise(75 * drift, 0.03)
+        vibracao = noise(5 * drift, 0.08)
         corrente = noise(i_nom * (0.75 + 0.1 * drift), 0.04)
         rpm    = noise(rpm_nom * (1 - 0.02 * (drift - 1)), 0.01)
         tensao = noise(v_nom, 0.02)

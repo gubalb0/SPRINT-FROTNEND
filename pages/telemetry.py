@@ -267,9 +267,9 @@ def render():
             st.markdown(
                 f"""
                 <div style="display:flex;justify-content:space-between;
-                            padding:7px 0;border-bottom:1px solid #f0f0f0;color:#111;">
-                  <span style="color:#888;font-size:12px;font-weight:600;text-transform:uppercase;">{campo}</span>
-                  <span style="font-weight:700;font-size:13px;">{valor}</span>
+                            padding:7px 0;border-bottom:1px solid #333;color:#fff;">
+                  <span style="color:#aaa;font-size:12px;font-weight:600;text-transform:uppercase;">{campo}</span>
+                  <span style="color:#fff;font-weight:700;font-size:13px;">{valor}</span>
                 </div>
                 """,
                 unsafe_allow_html=True,
