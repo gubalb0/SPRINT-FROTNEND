@@ -128,56 +128,38 @@ def card_recomendacao(rec):
 def painel_estado(equipamento, severidade, descricao_nlp, mudou=False):
     """Renderiza o painel de estado operacional de um ativo."""
     s = _sem(severidade)
-    pulse = (
-        "animation:pulseState 1.4s ease-in-out 3;" if mudou else ""
-    )
+    pulse = "animation:pulseState 1.4s ease-in-out 3;" if mudou else ""
     badge_mudou = (
-        '<span style="background:#FF6B00;color:#fff;padding:2px 8px;border-radius:50px;'
-        'font-size:9px;font-weight:800;letter-spacing:1px;">ESTADO ALTERADO</span>'
+        '<span style="background:#FF6B00;color:#fff;padding:2px 8px;border-radius:50px;font-size:9px;font-weight:800;letter-spacing:1px;">ESTADO ALTERADO</span>'
         if mudou else ""
     )
 
-    st.markdown(
-        f"""
-        <style>
-        @keyframes pulseState {{
-          0%,100% {{ box-shadow:0 3px 14px rgba(0,0,0,0.07); }}
-          50%     {{ box-shadow:0 0 0 5px {s['cor']}44; }}
-        }}
-        </style>
-        <div style="background:#fff;border-radius:12px;padding:18px 20px;
-                    border-left:6px solid {s['cor']};margin-bottom:12px;color:#111;
-                    box-shadow:0 3px 14px rgba(0,0,0,0.07);{pulse}">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;
-                      flex-wrap:wrap;gap:8px;">
-            <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">
-              <span style="background:#FF6B00;color:#fff;padding:3px 11px;
-                           border-radius:50px;font-size:11px;font-weight:700;">{equipamento['tag']}</span>
-              <span style="font-family:'Barlow Condensed',sans-serif;font-size:20px;
-                           font-weight:700;color:#3D1A6E;">{equipamento['nome']}</span>
-              {badge_mudou}
-            </div>
-            <span style="background:{s['bg']};color:{s['cor']};padding:4px 14px;
-                         border-radius:50px;font-size:12px;font-weight:800;">
-              {s['icon']} {s['label']}</span>
-          </div>
-
-          <div style="font-size:11px;color:#888;margin-top:6px;">
-            📍 {equipamento.get('local_instalacao','—')} &nbsp;|&nbsp;
-            ⚙️ {equipamento.get('modelo','—')} &nbsp;|&nbsp;
-            ⚡ {equipamento.get('potencia_kw','—')} kW
-          </div>
-
-          <div style="background:#f8f8fa;border-radius:8px;padding:11px 13px;margin-top:11px;
-                      border-left:3px solid {s['cor']};">
-            <div style="font-size:9px;font-weight:800;letter-spacing:1.3px;
-                        color:#3D1A6E;margin-bottom:5px;">🧠 DESCRIÇÃO DO ESTADO (NLP)</div>
-            <div style="font-size:12.5px;line-height:1.6;color:#444;">{descricao_nlp}</div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    html = (
+        "<style>@keyframes pulseState{0%,100%{box-shadow:0 3px 14px rgba(0,0,0,0.07);}"
+        f"50%{{box-shadow:0 0 0 5px {s['cor']}44;}}}}</style>"
+        f'<div style="background:#fff;border-radius:12px;padding:18px 20px;'
+        f'border-left:6px solid {s["cor"]};margin-bottom:12px;color:#111;'
+        f'box-shadow:0 3px 14px rgba(0,0,0,0.07);{pulse}">'
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">'
+        '<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;">'
+        f'<span style="background:#FF6B00;color:#fff;padding:3px 11px;border-radius:50px;font-size:11px;font-weight:700;">{equipamento["tag"]}</span>'
+        f'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:20px;font-weight:700;color:#3D1A6E;">{equipamento["nome"]}</span>'
+        f'{badge_mudou}'
+        '</div>'
+        f'<span style="background:{s["bg"]};color:{s["cor"]};padding:4px 14px;border-radius:50px;font-size:12px;font-weight:800;">{s["icon"]} {s["label"]}</span>'
+        '</div>'
+        f'<div style="font-size:11px;color:#888;margin-top:6px;">'
+        f'📍 {equipamento.get("local_instalacao","—")} &nbsp;|&nbsp; '
+        f'⚙️ {equipamento.get("modelo","—")} &nbsp;|&nbsp; '
+        f'⚡ {equipamento.get("potencia_kw","—")} kW</div>'
+        f'<div style="background:#f8f8fa;border-radius:8px;padding:11px 13px;margin-top:11px;'
+        f'border-left:3px solid {s["cor"]};">'
+        '<div style="font-size:9px;font-weight:800;letter-spacing:1.3px;color:#3D1A6E;margin-bottom:5px;">'
+        '🧠 DESCRIÇÃO DO ESTADO (NLP)</div>'
+        f'<div style="font-size:12.5px;line-height:1.6;color:#444;">{descricao_nlp}</div>'
+        '</div></div>'
     )
+    st.markdown(html, unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
