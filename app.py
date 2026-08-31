@@ -27,29 +27,40 @@ with st.sidebar:
     )
     st.markdown("---")
 
-    # Alerta badge no sidebar
-    alertas = st.session_state.get("alertas", [])
-    criticos = sum(1 for a in alertas if a["tipo"] == "critico")
+    # Badge de alertas críticos
+    estados = st.session_state.get("estados_ativos", {})
+    criticos = sum(1 for s in estados.values() if s == "critico")
+    atencao = sum(1 for s in estados.values() if s == "atencao")
+
     if criticos:
         st.markdown(
-            f'<div style="background:#DC3545;color:white;border-radius:8px;'
-            f'padding:8px 14px;font-size:12px;font-weight:700;margin-bottom:8px;text-align:center;">'
-            f'🚨 {criticos} alerta(s) crítico(s)</div>',
+            f'<div style="background:#DC3545;color:#fff;border-radius:8px;'
+            f'padding:9px 14px;font-size:12px;font-weight:800;margin-bottom:6px;'
+            f'text-align:center;letter-spacing:0.5px;">'
+            f'🚨 {criticos} ATIVO(S) CRÍTICO(S)</div>',
+            unsafe_allow_html=True,
+        )
+    if atencao:
+        st.markdown(
+            f'<div style="background:#FFC107;color:#4a3800;border-radius:8px;'
+            f'padding:8px 14px;font-size:11.5px;font-weight:800;margin-bottom:8px;'
+            f'text-align:center;">⚠️ {atencao} EM ATENÇÃO</div>',
             unsafe_allow_html=True,
         )
 
     pages = {
-        "🏠  Dashboard":        "dashboard",
-        "🏭  Plantas & Áreas":  "plant_nav",
-        "📊  Telemetria":       "telemetry",
-        "🚨  Alertas":          "alerts",
-        "📋  Equipamentos":     "equipment_list",
-        "➕  Cadastro":         "equipment_form",
-        "🔢  Dados Brutos":     "raw_data",
+        "🚨  Painel de Alertas": "operations_panel",
+        "🏠  Dashboard":         "dashboard",
+        "🏭  Plantas & Áreas":   "plant_nav",
+        "📊  Telemetria":        "telemetry",
+        "📜  Histórico":         "alerts",
+        "📋  Equipamentos":      "equipment_list",
+        "➕  Cadastro":          "equipment_form",
+        "🔢  Dados Brutos":      "raw_data",
     }
 
     if "active_page" not in st.session_state:
-        st.session_state.active_page = "dashboard"
+        st.session_state.active_page = "operations_panel"
 
     for label, key in pages.items():
         if st.button(label, key=f"nav_{key}", use_container_width=True):
@@ -60,16 +71,26 @@ with st.sidebar:
             st.rerun()
 
     st.markdown("---")
+
+    if st.button("♻️  Reiniciar Simulação", use_container_width=True, key="reset_sim"):
+        for k in ("ciclo_analise", "estados_ativos", "eventos_novos",
+                  "mudancas_estado", "historico_eventos", "ultima_analise"):
+            st.session_state.pop(k, None)
+        st.session_state.active_page = "operations_panel"
+        st.rerun()
+
     st.markdown(
-        '<p style="color:#888;font-size:11px;text-align:center;">'
-        'Motor Intelligence v2.0<br>Sprint 2 — Telemetria & Dashboards</p>',
+        '<p style="color:#888;font-size:11px;text-align:center;margin-top:8px;">'
+        'Motor Intelligence v3.0<br>Sprint 3 — Inteligência Operacional</p>',
         unsafe_allow_html=True,
     )
 
 # ── Page Router ─────────────────────────────────────────────────────────────
 page = st.session_state.active_page
 
-if page == "dashboard":
+if page == "operations_panel":
+    from pages import operations_panel; operations_panel.render()
+elif page == "dashboard":
     from pages import dashboard; dashboard.render()
 elif page == "plant_nav":
     from pages import plant_nav; plant_nav.render()
