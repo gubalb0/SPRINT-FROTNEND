@@ -31,19 +31,29 @@ def _hora(ts):
 # ═══════════════════════════════════════════════════════════════════════════
 # CARD DE ALERTA
 # ═══════════════════════════════════════════════════════════════════════════
-def card_alerta(evento, nome_equipamento, resumo_nlp, novo=False):
-    """Renderiza um card de alerta com resumo textual gerado por NLP."""
+def card_alerta(evento, nome_equipamento, resumo_nlp, novo=False, reconhecimento=None):
+    """Renderiza um card de alerta com resumo textual gerado por NLP.
+
+    Sprint 4: `reconhecimento` ({"hora", "operador"}) marca o alerta como tratado
+    pelo operador e reduz o destaque visual do card.
+    """
     s = _sem(evento["severidade"])
     hora = _hora(evento["timestamp"])
     score = evento.get("score_anomalia", 0) * 100
     badge_novo = (
         '<span style="background:#FF6B00;color:#fff;padding:2px 9px;border-radius:50px;'
         'font-size:10px;font-weight:800;letter-spacing:1px;margin-left:6px;">NOVO</span>'
-    ) if novo else ""
+    ) if novo and not reconhecimento else ""
+    badge_ack = (
+        '<span style="background:#28A745;color:#fff;padding:2px 9px;border-radius:50px;'
+        'font-size:10px;font-weight:800;letter-spacing:1px;margin-left:6px;">'
+        f'RECONHECIDO {_hora(reconhecimento["hora"])}</span>'
+    ) if reconhecimento else ""
+    opacidade = "opacity:0.72;" if reconhecimento else ""
 
     html = (
         f'<div style="background:{s["bg"]};border-radius:12px;padding:18px 22px;'
-        f'border-left:6px solid {s["cor"]};margin-bottom:12px;color:#111;'
+        f'border-left:6px solid {s["cor"]};margin-bottom:12px;color:#111;{opacidade}'
         f'box-shadow:0 3px 14px rgba(0,0,0,0.06);">'
         '<div style="display:flex;justify-content:space-between;align-items:center;'
         'flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
@@ -55,7 +65,7 @@ def card_alerta(evento, nome_equipamento, resumo_nlp, novo=False):
         f'font-size:11px;font-weight:700;">{evento["tag"]}</span>'
         f'<span style="font-family:\'Barlow Condensed\',sans-serif;font-size:19px;'
         f'font-weight:700;color:#3D1A6E;">{nome_equipamento}</span>'
-        f'{badge_novo}'
+        f'{badge_novo}{badge_ack}'
         '</div>'
         f'<span style="font-size:11px;color:#888;">🕐 {hora}</span>'
         '</div>'
@@ -72,6 +82,7 @@ def card_alerta(evento, nome_equipamento, resumo_nlp, novo=False):
         f'<span><b>Limite:</b> {evento["limite"]} {evento.get("unidade","")}</span>'
         f'<span><b>Score anomalia:</b> {score:.0f}%</span>'
         f'<span><b>Modelo:</b> {evento.get("modelo","—")}</span>'
+        f'<span><b>trace_id:</b> {evento.get("trace_id","—")}</span>'
         '</div></div>'
     )
     st.markdown(html, unsafe_allow_html=True)

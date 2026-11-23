@@ -9,45 +9,36 @@ Camada de APRESENTAÇÃO apenas. Consome:
 Não contém regra de negócio nem lógica de modelo.
 """
 
-import streamlit as st
-from datetime import datetime
+import logging
 
-from services import alert_engine, nlp_service
+import streamlit as st
+
+from services import alert_engine, nlp_service, monitoring
 from components import cards
 
 INTERVALO_AUTO_SEG = 15
+log = logging.getLogger("forzy.painel")
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# ORQUESTRAÇÃO — executa um ciclo de análise
-# ═══════════════════════════════════════════════════════════════════════════
-def _executar_ciclo():
-    """Dispara o modelo analítico, atualiza estados e gera textos via NLP."""
-    ciclo = st.session_state.ciclo_analise
+def _executar_ciclo_seguro():
+    """Executa um ciclo tratando falhas de forma amigável (Sprint 4).
 
-    eventos, estados = alert_engine.detectar_anomalias(ciclo)
-
-    # Detecta quais ativos mudaram de estado neste ciclo
-    estados_anteriores = st.session_state.get("estados_ativos", {})
-    mudancas = {
-        tag: nova
-        for tag, nova in estados.items()
-        if estados_anteriores.get(tag) and estados_anteriores[tag] != nova
-    }
-
-    # Propaga o estado para o cadastro de equipamentos (gestão de estado global)
-    for eq in st.session_state.equipment_list:
-        if eq["tag"] in estados:
-            eq["saude"] = estados[eq["tag"]]
-
-    st.session_state.estados_ativos     = estados
-    st.session_state.mudancas_estado    = mudancas
-    st.session_state.eventos_novos      = eventos
-    st.session_state.historico_eventos  = st.session_state.get("historico_eventos", []) + eventos
-    st.session_state.ultima_analise     = datetime.now()
-
-    if ciclo < alert_engine.total_ciclos() - 1:
-        st.session_state.ciclo_analise = ciclo + 1
+    Se o modelo/serviço falhar, o painel mantém o último estado válido e mostra
+    uma mensagem com o trace_id em vez de um traceback do Python.
+    """
+    try:
+        resumo = monitoring.executar_ciclo(st.session_state)
+        if resumo["descartados"]:
+            st.session_state.aviso_contrato = (
+                f"{resumo['descartados']} evento(s) descartado(s) por não respeitarem "
+                f"o contrato do modelo (trace_id {resumo['trace_id']})."
+            )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        trace_id = monitoring.novo_trace_id()
+        log.exception("falha no ciclo de análise trace_id=%s", trace_id)
+        st.session_state.erro_ciclo = {"trace_id": trace_id, "tipo": type(exc).__name__}
+        return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -55,10 +46,7 @@ def _executar_ciclo():
 # ═══════════════════════════════════════════════════════════════════════════
 def render():
     # ── Estado inicial ─────────────────────────────────────────────────────
-    if "ciclo_analise" not in st.session_state:
-        st.session_state.ciclo_analise = 0
-    if "estados_ativos" not in st.session_state:
-        _executar_ciclo()
+    monitoring.garantir_inicializado(st.session_state)
 
     eq_list = st.session_state.get("equipment_list", [])
     eq_por_tag = {e["tag"]: e for e in eq_list}
@@ -94,13 +82,26 @@ def render():
             f'<div style="padding-top:9px;font-size:12px;color:#888;">'
             f'Última análise: <b style="color:#FF6B00">{ultima_txt}</b> &nbsp;•&nbsp; '
             f'Ciclo <b>{ciclo_atual}</b> de {total - 1} &nbsp;•&nbsp; '
-            f'Modelo: <b>{alert_engine.MODELO_VERSAO}</b></div>',
+            f'Modelo: <b>{alert_engine.MODELO_VERSAO}</b> &nbsp;•&nbsp; '
+            f'trace_id: <code>{st.session_state.get("trace_id", "—")}</code></div>',
             unsafe_allow_html=True,
         )
 
     if atualizar:
-        _executar_ciclo()
+        st.session_state.pop("erro_ciclo", None)
+        _executar_ciclo_seguro()
         st.rerun()
+
+    erro = st.session_state.get("erro_ciclo")
+    if erro:
+        st.error(
+            "Não foi possível atualizar a análise agora. Os dados exibidos são do "
+            f"último ciclo válido. Se o problema persistir, informe o código "
+            f"**{erro['trace_id']}** ao suporte."
+        )
+    aviso = st.session_state.pop("aviso_contrato", None)
+    if aviso:
+        st.warning(aviso)
 
     if st.session_state.ciclo_analise >= alert_engine.total_ciclos() - 1:
         st.markdown(
@@ -123,7 +124,7 @@ def render():
 def _conteudo(eq_por_tag, auto_on=False):
     """Bloco recarregável do painel."""
     if auto_on:
-        _executar_ciclo()
+        _executar_ciclo_seguro()
 
     estados   = st.session_state.get("estados_ativos", {})
     novos     = st.session_state.get("eventos_novos", [])
@@ -156,7 +157,7 @@ def _conteudo(eq_por_tag, auto_on=False):
         (k1, criticos,        "Ativos Críticos",   "🔴", "#DC3545"),
         (k2, atencao,         "Em Atenção",         "🟡", "#C89A00"),
         (k3, normais,         "Operando Normal",    "🟢", "#28A745"),
-        (k4, len(historico),  "Eventos Registrados","📋", "#3D1A6E"),
+        (k4, len(monitoring.pendentes(st.session_state)), "Pendentes de Ação", "📌", "#3D1A6E"),
     ]
     for col, val, label, icon, cor in kpis:
         with col:
@@ -183,16 +184,7 @@ def _conteudo(eq_por_tag, auto_on=False):
     st.markdown('<div class="section-divider"><span>Alertas Ativos</span></div>',
                 unsafe_allow_html=True)
 
-    ativos = [e for e in historico if e["severidade"] in ("critico", "atencao")]
-    # mantém apenas o evento mais recente por (tag, métrica)
-    vistos, alertas_ativos = set(), []
-    for ev in reversed(ativos):
-        chave = (ev["tag"], ev["metrica"])
-        if chave not in vistos:
-            vistos.add(chave)
-            alertas_ativos.append(ev)
-    ordem = {"critico": 0, "atencao": 1}
-    alertas_ativos.sort(key=lambda e: ordem.get(e["severidade"], 2))
+    alertas_ativos = monitoring.alertas_ativos(st.session_state)
 
     if not alertas_ativos:
         st.markdown(
@@ -207,9 +199,22 @@ def _conteudo(eq_por_tag, auto_on=False):
         for ev in alertas_ativos:
             eq = eq_por_tag.get(ev["tag"], {})
             resumo = nlp_service.resumir_evento(ev, eq)
-            cards.card_alerta(ev, eq.get("nome", ev["tag"]), resumo, novo=ev["id"] in ids_novos)
+            rec = monitoring.reconhecimento(st.session_state, ev["id"])
+            cards.card_alerta(ev, eq.get("nome", ev["tag"]), resumo,
+                              novo=ev["id"] in ids_novos, reconhecimento=rec)
 
-            b1, b2, _ = st.columns([1.1, 1.1, 4])
+            b0, b1, b2, b3, b4, _ = st.columns([1.3, 1.1, 0.9, 0.55, 0.55, 1.6])
+            with b0:
+                if rec is None:
+                    if st.button("✔ Reconhecer", key=f"pa_ack_{ev['id']}", type="primary"):
+                        monitoring.reconhecer_alerta(st.session_state, ev["id"])
+                        st.rerun()
+                else:
+                    st.markdown(
+                        f'<div style="padding-top:8px;font-size:12px;color:#28A745;font-weight:700;">'
+                        f'✔ Reconhecido {rec["hora"].strftime("%H:%M:%S")}</div>',
+                        unsafe_allow_html=True,
+                    )
             with b1:
                 if st.button("📊 Telemetria", key=f"pa_tel_{ev['id']}"):
                     st.session_state.selected_equipment_id = ev["tag"]
@@ -222,6 +227,23 @@ def _conteudo(eq_por_tag, auto_on=False):
                     st.session_state.edit_data = eq
                     st.session_state.active_page = "equipment_form"
                     st.rerun()
+            fb = monitoring.feedback(st.session_state, ev["id"])
+            if fb is None:
+                with b3:
+                    if st.button("👍", key=f"pa_fb_up_{ev['id']}", help="O resumo de IA foi útil"):
+                        monitoring.registrar_feedback(st.session_state, ev["id"], True)
+                        st.rerun()
+                with b4:
+                    if st.button("👎", key=f"pa_fb_dn_{ev['id']}", help="O resumo de IA não ajudou"):
+                        monitoring.registrar_feedback(st.session_state, ev["id"], False)
+                        st.rerun()
+            else:
+                with b3:
+                    st.markdown(
+                        '<div style="padding-top:8px;font-size:11px;color:#888;white-space:nowrap;">'
+                        f'{"👍" if fb["util"] else "👎"} feedback registrado</div>',
+                        unsafe_allow_html=True,
+                    )
 
     # ── Apoio à decisão ────────────────────────────────────────────────────
     st.markdown('<div class="section-divider"><span>Apoio à Decisão — Ações Recomendadas</span></div>',
