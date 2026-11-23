@@ -1,7 +1,11 @@
-import streamlit as st
-from datetime import datetime, timedelta
-import random
+import copy
 import math
+import random
+from datetime import datetime, timedelta
+
+import streamlit as st
+
+from services import monitoring
 
 PLANTS = {
     "Planta A — Utilidades": {
@@ -145,7 +149,10 @@ def gerar_historico(eq, horas=24, intervalo_min=10):
 
 def init_session():
     if "equipment_list" not in st.session_state:
-        st.session_state.equipment_list = SAMPLE_EQUIPMENT.copy()
+        # Sprint 4: deepcopy — antes era SAMPLE_EQUIPMENT.copy() (cópia rasa), e
+        # o painel alterava eq["saude"] nos dicts do módulo, vazando estado
+        # entre sessões/abas e impedindo o "Reiniciar Simulação" de voltar ao início.
+        st.session_state.equipment_list = copy.deepcopy(SAMPLE_EQUIPMENT)
     if "historicos" not in st.session_state:
         st.session_state.historicos = {
             eq["id"]: gerar_historico(eq) for eq in SAMPLE_EQUIPMENT
@@ -153,7 +160,9 @@ def init_session():
     if "selected_equipment_id" not in st.session_state:
         st.session_state.selected_equipment_id = None
     if "active_page" not in st.session_state:
-        st.session_state.active_page = "dashboard"
+        # Sprint 4: o Painel de Alertas passa a ser de fato a página inicial
+        # (na Sprint 3 este valor era "dashboard" e sobrescrevia o app.py).
+        st.session_state.active_page = "operations_panel"
     if "form_mode" not in st.session_state:
         st.session_state.form_mode = "new"
     if "edit_data" not in st.session_state:
@@ -162,25 +171,18 @@ def init_session():
         st.session_state.planta_selecionada = None
     if "area_selecionada" not in st.session_state:
         st.session_state.area_selecionada = None
-    if "alertas" not in st.session_state:
-        # Gera alertas iniciais baseados nos equipamentos críticos
-        st.session_state.alertas = [
-            {
-                "tag": "MTR-002",
-                "tipo": "critico",
-                "mensagem": "Temperatura acima do limite operacional (82°C > 80°C)",
-                "timestamp": (datetime.now() - timedelta(minutes=23)).strftime("%H:%M"),
-            },
-            {
-                "tag": "MTR-003",
-                "tipo": "atencao",
-                "mensagem": "Vibração em tendência crescente nas últimas 2h",
-                "timestamp": (datetime.now() - timedelta(minutes=47)).strftime("%H:%M"),
-            },
-            {
-                "tag": "MTR-001",
-                "tipo": "normal",
-                "mensagem": "Todos os parâmetros dentro do limite nominal",
-                "timestamp": (datetime.now() - timedelta(minutes=5)).strftime("%H:%M"),
-            },
-        ]
+
+    # Sprint 4: a lista estática `alertas` (legado da Sprint 2) foi removida.
+    # Todas as páginas consomem o mesmo histórico gerado pelo serviço de monitoramento.
+    try:
+        monitoring.garantir_inicializado(st.session_state)
+    except Exception:  # noqa: BLE001 — a página exibe o erro de forma amigável
+        st.session_state.setdefault("erro_monitoramento", True)
+
+
+def reset_equipamentos():
+    """Restaura a saúde dos ativos para o seed original."""
+    seed = {e["tag"]: e["saude"] for e in SAMPLE_EQUIPMENT}
+    for eq in st.session_state.get("equipment_list", []):
+        if eq["tag"] in seed:
+            eq["saude"] = seed[eq["tag"]]

@@ -3,7 +3,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
-from utils.session import init_session
+from utils.session import init_session, reset_equipamentos
+from services import monitoring
 from utils.theme import inject_css
 
 st.set_page_config(
@@ -47,6 +48,14 @@ with st.sidebar:
             f'text-align:center;">⚠️ {atencao} EM ATENÇÃO</div>',
             unsafe_allow_html=True,
         )
+    n_pend = len(monitoring.pendentes(st.session_state))
+    if n_pend:
+        st.markdown(
+            f'<div style="background:#FF6B00;color:#fff;border-radius:8px;'
+            f'padding:7px 14px;font-size:11px;font-weight:800;margin-bottom:8px;'
+            f'text-align:center;">📌 {n_pend} ALERTA(S) SEM RECONHECIMENTO</div>',
+            unsafe_allow_html=True,
+        )
 
     pages = {
         "🚨  Painel de Alertas": "operations_panel",
@@ -73,15 +82,14 @@ with st.sidebar:
     st.markdown("---")
 
     if st.button("♻️  Reiniciar Simulação", use_container_width=True, key="reset_sim"):
-        for k in ("ciclo_analise", "estados_ativos", "eventos_novos",
-                  "mudancas_estado", "historico_eventos", "ultima_analise"):
-            st.session_state.pop(k, None)
+        monitoring.reiniciar(st.session_state)
+        reset_equipamentos()
         st.session_state.active_page = "operations_panel"
         st.rerun()
 
     st.markdown(
         '<p style="color:#888;font-size:11px;text-align:center;margin-top:8px;">'
-        'Motor Intelligence v3.0<br>Sprint 3 — Inteligência Operacional</p>',
+        'Motor Intelligence v4.0<br>Sprint 4 — Consolidação</p>',
         unsafe_allow_html=True,
     )
 
