@@ -1,10 +1,10 @@
 import streamlit as st
-from datetime import datetime
+
+from services import monitoring
 
 
 def render():
     eq_list = st.session_state.get("equipment_list", [])
-    alertas = st.session_state.get("alertas", [])
     total   = len(eq_list)
     ativos  = sum(1 for e in eq_list if e["status"] == "Ativo")
     manut   = sum(1 for e in eq_list if e["status"] == "Manutenção")
@@ -46,18 +46,19 @@ def render():
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── Alertas ativos no topo ─────────────────────────────────
-    alertas_crit = [a for a in alertas if a["tipo"] == "critico"]
+    # Sprint 4: banner alimentado pelo mesmo serviço do Painel de Alertas
+    # (antes vinha de uma lista estática e mostrava 82 °C enquanto o painel mostrava 84,3 °C).
+    alertas_crit = [e for e in monitoring.alertas_ativos(st.session_state) if e["severidade"] == "critico"]
     if alertas_crit:
         for a in alertas_crit:
             st.markdown(
-                f"""
-                <div style="background:#fff0f0;border-radius:8px;padding:12px 18px;
-                            border-left:5px solid #DC3545;margin-bottom:8px;color:#111;
-                            display:flex;justify-content:space-between;align-items:center;">
-                  <span>🔴 <strong>{a['tag']}</strong> — {a['mensagem']}</span>
-                  <span style="font-size:11px;color:#888;">🕐 {a['timestamp']}</span>
-                </div>
-                """,
+                '<div style="background:#fff0f0;border-radius:8px;padding:12px 18px;'
+                'border-left:5px solid #DC3545;margin-bottom:8px;color:#111;'
+                'display:flex;justify-content:space-between;align-items:center;">'
+                f'<span>🔴 <strong>{a["tag"]}</strong> — {a["metrica_label"]} em '
+                f'{a["valor"]} {a["unidade"]} (limite {a["limite"]} {a["unidade"]})</span>'
+                f'<span style="font-size:11px;color:#888;">🕐 {a["timestamp"].strftime("%H:%M")}</span>'
+                '</div>',
                 unsafe_allow_html=True,
             )
 
@@ -129,7 +130,7 @@ def render():
         (qa2, "📋 Equipamentos", "equipment_list", None),
         (qa3, "🏭 Plantas",      "plant_nav",      None),
         (qa4, "📊 Telemetria",   "telemetry",      None),
-        (qa5, "🚨 Alertas",      "alerts",         None),
+        (qa5, "🚨 Alertas",      "operations_panel", None),
     ]
     for col, label, page, mode in actions:
         with col:

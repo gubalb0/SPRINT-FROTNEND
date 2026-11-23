@@ -1,8 +1,45 @@
+"""
+HISTÓRICO DE EVENTOS — Sprint 4.
+
+Na Sprint 3 esta página lia `st.session_state.alertas`, uma lista estática criada
+na Sprint 2, e por isso mostrava valores diferentes do Painel de Alertas
+(ex.: MTR-002 a 82 °C aqui e 84,3 °C no painel). Agora ela consome o mesmo
+histórico produzido por `services.monitoring`, com filtros, status de
+reconhecimento, feedback de IA e exportação CSV.
+"""
+
+import pandas as pd
 import streamlit as st
-from datetime import datetime, timedelta
+
+from components import cards
+from services import monitoring
+
+
+def _linhas(historico, eq_por_tag):
+    linhas = []
+    for ev in reversed(historico):
+        rec = monitoring.reconhecimento(st.session_state, ev["id"])
+        fb = monitoring.feedback(st.session_state, ev["id"])
+        linhas.append({
+            "Hora": ev["timestamp"].strftime("%H:%M:%S"),
+            "Severidade": cards.CORES.get(ev["severidade"], {}).get("label", ev["severidade"]),
+            "TAG": ev["tag"],
+            "Equipamento": eq_por_tag.get(ev["tag"], {}).get("nome", "—"),
+            "Sensor": ev.get("metrica_label", ev["metrica"]),
+            "Medido": f'{ev["valor"]} {ev.get("unidade", "")}',
+            "Limite": f'{ev["limite"]} {ev.get("unidade", "")}',
+            "Score": f'{ev["score_anomalia"] * 100:.0f}%',
+            "Reconhecido": rec["hora"].strftime("%H:%M:%S") if rec else "—",
+            "Feedback IA": ("👍" if fb["util"] else "👎") if fb else "—",
+            "trace_id": ev.get("trace_id", "—"),
+            "_sev": ev["severidade"],
+        })
+    return linhas
 
 
 def render():
+    monitoring.garantir_inicializado(st.session_state)
+
     st.markdown(
         '<div class="topbar-strip">'
         '<div class="strip-seg s1"></div><div class="strip-seg s1"></div>'
@@ -12,117 +49,82 @@ def render():
     )
     st.markdown(
         '<div class="page-header">'
-        "<h1>Central de Alertas</h1>"
-        "<p>Monitoramento de eventos e anomalias detectadas nos ativos</p>"
+        "<h1>Histórico de Eventos</h1>"
+        "<p>Rastreabilidade de todos os eventos detectados pelo modelo analítico</p>"
         "</div>",
         unsafe_allow_html=True,
     )
 
-    alertas = st.session_state.get("alertas", [])
-    eq_list = st.session_state.get("equipment_list", [])
+    historico = st.session_state.get("historico_eventos", [])
+    eq_por_tag = {e["tag"]: e for e in st.session_state.get("equipment_list", [])}
 
     # ── KPIs ───────────────────────────────────────────────────
-    criticos = sum(1 for a in alertas if a["tipo"] == "critico")
-    atencao  = sum(1 for a in alertas if a["tipo"] == "atencao")
-    normais  = sum(1 for a in alertas if a["tipo"] == "normal")
-
-    k1, k2, k3 = st.columns(3)
-    with k1:
-        st.markdown(
-            f'<div class="kpi-card" style="border-top-color:#DC3545;">'
-            f'<div class="kpi-icon">🔴</div>'
-            f'<div class="kpi-value" style="color:#DC3545;">{criticos}</div>'
-            f'<div class="kpi-label">Alertas Críticos</div></div>',
-            unsafe_allow_html=True,
-        )
-    with k2:
-        st.markdown(
-            f'<div class="kpi-card yellow"><div class="kpi-icon">🟡</div>'
-            f'<div class="kpi-value">{atencao}</div>'
-            f'<div class="kpi-label">Alertas de Atenção</div></div>',
-            unsafe_allow_html=True,
-        )
-    with k3:
-        st.markdown(
-            f'<div class="kpi-card success"><div class="kpi-icon">🟢</div>'
-            f'<div class="kpi-value">{normais}</div>'
-            f'<div class="kpi-label">Operando Normal</div></div>',
-            unsafe_allow_html=True,
-        )
+    feedbacks = st.session_state.get("feedback_nlp", {})
+    uteis = sum(1 for f in feedbacks.values() if f["util"])
+    kpis = [
+        (sum(1 for e in historico if e["severidade"] == "critico"), "Eventos Críticos", "🔴", "#DC3545"),
+        (sum(1 for e in historico if e["severidade"] == "atencao"), "Eventos de Atenção", "🟡", "#C89A00"),
+        (len(st.session_state.get("reconhecimentos", {})), "Reconhecidos", "✔️", "#28A745"),
+        (f"{uteis}/{len(feedbacks)}" if feedbacks else "—", "Resumos de IA úteis", "🧠", "#3D1A6E"),
+    ]
+    for col, (val, label, icon, cor) in zip(st.columns(4), kpis):
+        with col:
+            st.markdown(
+                f'<div class="kpi-card" style="border-top-color:{cor};">'
+                f'<div class="kpi-icon">{icon}</div>'
+                f'<div class="kpi-value" style="color:{cor};">{val}</div>'
+                f'<div class="kpi-label">{label}</div></div>',
+                unsafe_allow_html=True,
+            )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Lista de alertas ───────────────────────────────────────
-    st.markdown('<div class="section-divider"><span>Eventos Recentes</span></div>', unsafe_allow_html=True)
+    if not historico:
+        st.info("Nenhum evento registrado ainda. Execute um ciclo em **Painel de Alertas → Atualizar Análise**.")
+        return
 
-    ordem = {"critico": 0, "atencao": 1, "normal": 2}
-    alertas_ord = sorted(alertas, key=lambda a: ordem.get(a["tipo"], 3))
+    # ── Filtros ────────────────────────────────────────────────
+    st.markdown('<div class="section-divider"><span>Eventos</span></div>', unsafe_allow_html=True)
+    f1, f2, f3 = st.columns([1.4, 1.4, 1.2])
+    with f1:
+        sev = st.multiselect("Severidade", ["CRÍTICO", "ATENÇÃO"], default=["CRÍTICO", "ATENÇÃO"])
+    with f2:
+        tags = st.multiselect("Equipamento (TAG)", sorted(eq_por_tag), default=sorted(eq_por_tag))
+    with f3:
+        so_pendentes = st.toggle("Só não reconhecidos", value=False)
 
-    for alerta in alertas_ord:
-        tipo    = alerta["tipo"]
-        cor     = {"critico": "#DC3545", "atencao": "#FFC107", "normal": "#28A745"}.get(tipo)
-        bg      = {"critico": "#fff0f0", "atencao": "#fffbf0", "normal": "#f0fff4"}.get(tipo)
-        icon    = {"critico": "🔴",      "atencao": "🟡",      "normal": "🟢"}.get(tipo)
-        label   = {"critico": "CRÍTICO", "atencao": "ATENÇÃO", "normal": "NORMAL"}.get(tipo)
-        eq      = next((e for e in eq_list if e["tag"] == alerta["tag"]), None)
-        nome_eq = eq["nome"] if eq else "—"
+    linhas = [
+        l for l in _linhas(historico, eq_por_tag)
+        if l["Severidade"] in sev and l["TAG"] in tags
+        and (not so_pendentes or l["Reconhecido"] == "—")
+    ]
 
-        st.markdown(
-            f"""
-            <div style="background:{bg};border-radius:10px;padding:16px 20px;
-                        border-left:5px solid {cor};margin-bottom:10px;color:#111;">
-              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-                <div style="display:flex;align-items:center;gap:10px;">
-                  <span style="font-size:20px;">{icon}</span>
-                  <div>
-                    <span style="background:{cor};color:white;padding:2px 10px;
-                                 border-radius:50px;font-size:11px;font-weight:700;">{label}</span>
-                    <span style="background:#FF6B00;color:white;padding:2px 10px;
-                                 border-radius:50px;font-size:11px;font-weight:700;margin-left:6px;">{alerta['tag']}</span>
-                    <span style="font-weight:700;font-size:14px;margin-left:8px;color:#3D1A6E;">{nome_eq}</span>
-                  </div>
-                </div>
-                <span style="font-size:12px;color:#888;">🕐 {alerta['timestamp']}</span>
-              </div>
-              <div style="margin-top:8px;font-size:13px;color:#444;">{alerta['mensagem']}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if tipo in ("critico", "atencao") and eq:
-            if st.button(f"📊 Ver Telemetria — {alerta['tag']}", key=f"alert_btn_{alerta['tag']}"):
-                st.session_state.selected_equipment_id = alerta["tag"]
+    if not linhas:
+        st.info("Nenhum evento corresponde aos filtros selecionados.")
+        return
+
+    df = pd.DataFrame(linhas)
+    cor_sev = {s["label"]: s["bg"] for s in cards.CORES.values()}
+
+    def _pinta(row):
+        return [f"background-color:{cor_sev.get(row['Severidade'], '#fff')};color:#111"] * len(row)
+
+    vis = df.drop(columns=["_sev"])
+    st.dataframe(vis.style.apply(_pinta, axis=1), use_container_width=True, hide_index=True)
+
+    st.download_button(
+        "⬇️  Exportar CSV",
+        vis.to_csv(index=False).encode("utf-8-sig"),
+        file_name="forzy_historico_eventos.csv",
+        mime="text/csv",
+    )
+
+    # ── Atalho para telemetria ────────────────────────────────
+    st.markdown('<div class="section-divider"><span>Investigar Ativo</span></div>', unsafe_allow_html=True)
+    cols = st.columns(len(eq_por_tag) or 1)
+    for col, tag in zip(cols, sorted(eq_por_tag)):
+        with col:
+            if st.button(f"📊 Telemetria — {tag}", key=f"hist_tel_{tag}", use_container_width=True):
+                st.session_state.selected_equipment_id = tag
                 st.session_state.active_page = "telemetry"
                 st.rerun()
-
-    # ── Tabela resumo ──────────────────────────────────────────
-    st.markdown('<div class="section-divider"><span>Resumo por Equipamento</span></div>', unsafe_allow_html=True)
-
-    rows_html = ""
-    for eq in eq_list:
-        saude   = eq.get("saude", "normal")
-        cor_s   = {"normal": "#28A745", "atencao": "#FFC107", "critico": "#DC3545"}.get(saude)
-        bg_s    = {"normal": "#e6f9ed",  "atencao": "#fff8e6",  "critico": "#fee"}.get(saude)
-        label_s = {"normal": "Normal",   "atencao": "Atenção",  "critico": "Crítico"}.get(saude)
-        icon_s  = {"normal": "🟢",       "atencao": "🟡",       "critico": "🔴"}.get(saude)
-        rows_html += (
-            f"<tr>"
-            f'<td><span style="background:#FF6B00;color:white;padding:2px 10px;'
-            f'border-radius:50px;font-size:11px;font-weight:700;">{eq["tag"]}</span></td>'
-            f"<td style='color:#111'>{eq['nome']}</td>"
-            f"<td style='color:#111'>{eq.get('planta','—')}</td>"
-            f"<td style='color:#111'>{eq['status']}</td>"
-            f'<td><span style="background:{bg_s};color:{cor_s};padding:3px 10px;'
-            f'border-radius:50px;font-size:11px;font-weight:600;">{icon_s} {label_s}</span></td>'
-            f"</tr>"
-        )
-
-    st.markdown(
-        f"""
-        <table class="forzy-table">
-          <thead><tr><th>TAG</th><th>Nome</th><th>Planta</th><th>Status</th><th>Saúde</th></tr></thead>
-          <tbody>{rows_html}</tbody>
-        </table>
-        """,
-        unsafe_allow_html=True,
-    )
