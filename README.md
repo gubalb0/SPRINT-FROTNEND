@@ -1,125 +1,106 @@
-# ⚡ Forzy Motor Intelligence — Sprint 1
+# ⚡ Forzy Motor Intelligence
 
-> Interface de cadastro técnico e visualização de dados de motores elétricos.
-> Desenvolvido com **Streamlit** e identidade visual **Forzy / Promon**.
+> Interface de monitoramento e apoio à decisão para motores elétricos industriais.
+> Desenvolvido com **Streamlit + pandas + Plotly** e identidade visual **Forzy / Promon**.
+> Challenge Forzy — disciplina de Front-End — FIAP, turma 2TIAPY.
 
----
+📄 **Documentação final (Sprint 4):** [`docs/DOCUMENTACAO_FINAL.md`](docs/DOCUMENTACAO_FINAL.md) · [PDF](docs/DOCUMENTACAO_FINAL.pdf)
 
-## 🗂️ Estrutura do Projeto
-
-```
-forzy_app/
-│
-├── app.py                  # Entry point — roteador de páginas + sidebar
-│
-├── pages/
-│   ├── __init__.py
-│   ├── dashboard.py        # Visão geral com KPIs e resumo
-│   ├── equipment_list.py   # Lista/datatable de equipamentos com filtros
-│   ├── equipment_form.py   # Formulário de cadastro, edição e ficha técnica
-│   └── raw_data.py         # Visualização de dados brutos com conversão
-│
-├── utils/
-│   ├── __init__.py
-│   ├── session.py          # Inicialização do session state e dados de exemplo
-│   └── theme.py            # CSS customizado com identidade Forzy (inject_css)
-│
-├── data/                   # (Futuro) persistência em JSON/SQLite
-├── assets/                 # (Futuro) imagens, logos, ícones
-│
-├── requirements.txt
-└── README.md
-```
+| Integrante | RM |
+|---|---|
+| Gustavo Balbo Saraiva | 561711 |
+| Henry Gimenez | _______ |
+| Ian Nobres | _______ |
+| Matheus Mikio | _______ |
 
 ---
 
-## 🚀 Como Rodar Localmente
-
-### 1. Pré-requisitos
-- Python 3.9+
-- pip
-
-### 2. Instalar dependências
+## 🚀 Como rodar
 
 ```bash
 pip install -r requirements.txt
+streamlit run app.py          # abre em http://localhost:8501
 ```
 
-### 3. Executar
+Testes dos serviços:
 
 ```bash
-streamlit run app.py
+pip install pytest
+python -m pytest -q
 ```
 
-A aplicação abrirá em `http://localhost:8501`.
+Demonstração do tratamento de erro (o modelo "cai" a partir do 2º ciclo):
+
+```bash
+FORZY_SIMULAR_FALHA=1 streamlit run app.py
+```
 
 ---
 
-## 📋 Funcionalidades — Sprint 1
+## 🧭 Jornada do usuário
 
-### 🏠 Dashboard
-- KPIs: total de equipamentos, ativos, em manutenção, inativos
-- Tabela com últimos equipamentos cadastrados
-- Estatísticas de potência total e fabricantes
-- Ações rápidas (cadastrar, listar, dados)
+1. **Monitorar** — o app abre no *Painel de Alertas e Estados* (KPIs, resumo executivo por NLP, estado de cada ativo).
+2. **Receber alerta** — *Atualizar Análise* (ou modo Auto, 15 s) executa um ciclo do modelo; novos alertas e mudanças de estado são notificados.
+3. **Agir** — o card traz resumo em linguagem natural e plano de ação (prazo, equipe, passos); o operador abre Telemetria/Ficha, clica em **✔ Reconhecer** e avalia o resumo da IA (👍/👎). Tudo fica no *Histórico* com `trace_id` e pode ser exportado em CSV.
 
-### 📋 Lista de Equipamentos
-- Datatable responsivo com todos os equipamentos
-- Filtros por nome/TAG, fabricante e status
-- Cards expansivos com dados principais
-- Botões de ação: Ficha Técnica, Editar, Dados Brutos
-
-### ➕ Cadastro / Ficha Técnica
-- Formulário com validação de campos obrigatórios
-- Seções: Identificação, Dados Elétricos, Proteção & Isolamento, Observações
-- Modo Ficha Técnica (read-only) e Edição
-- Feedback visual de sucesso/erro
-
-### 📊 Dados Brutos
-- Seleção de equipamento
-- Cards de sensores com valores convertidos em unidades de engenharia:
-  - Tensão (V), Corrente (A), Rotação (RPM), Temperatura (°C), Vibração (mm/s), Potência (kW)
-- Indicadores de status semântico (verde/amarelo/vermelho)
-- Exposição dos valores RAW de ADC (0–4095)
-- Tabela de fatores de conversão por canal
-- Gráfico histórico simulado (linha de tendência)
+Use **♻️ Reiniciar Simulação** na barra lateral para recomeçar o cenário de demonstração.
 
 ---
 
-## 🎨 Design System
+## 🗂️ Estrutura
 
-| Token         | Valor     | Uso                        |
-|---------------|-----------|----------------------------|
-| `--orange`    | `#FF6B00` | Cor primária, CTAs, destaques |
-| `--purple`    | `#3D1A6E` | Sidebar, headers, títulos  |
-| `--yellow`    | `#F5C400` | Alertas, KPI de atenção    |
-| `--success`   | `#28A745` | Status ativo / OK          |
-| `--warning`   | `#FFC107` | Status manutenção / alerta |
-| `--danger`    | `#DC3545` | Status inativo / crítico   |
-
-Fontes: **Barlow Condensed** (display/títulos) + **Inter** (corpo/labels)
-
----
-
-## 🔮 Roadmap — Próximas Sprints
-
-| Sprint | Entregável                                               |
-|--------|----------------------------------------------------------|
-| 2      | Integração com sensores reais (MQTT / API REST)          |
-| 2      | Persistência em SQLite ou banco de séries temporais      |
-| 3      | Modelo de ML para detecção de anomalias                  |
-| 3      | Alertas automáticos (e-mail / webhook)                   |
-| 4      | Dashboard preditivo com horizon de manutenção            |
-
----
-
-## 🏗️ Decisões de Arquitetura
-
-- **Desacoplamento frontend/backend**: as páginas consomem apenas `st.session_state` e funções utilitárias — o modelo de ML pode ser integrado em `utils/model.py` sem alterar nenhuma página.
-- **Framework substituível**: todo o CSS vive em `utils/theme.py`. Migrar de Streamlit para Gradio ou FastAPI+React exige apenas reescrever as páginas, sem alterar lógica de negócio.
-- **Dados mockados**: `utils/session.py` popula dados de exemplo no `session_state`. Na Sprint 2, basta substituir esse seed por uma chamada ao banco de dados.
+```
+app.py                     # entry point: sidebar, badges e roteador de páginas
+pages/
+  operations_panel.py      # Painel de Alertas e Estados (página inicial)
+  alerts.py                # Histórico de eventos (filtros, CSV, trace_id)
+  dashboard.py             # Visão geral do parque
+  plant_nav.py             # Plantas → Áreas → Ativos
+  telemetry.py             # Séries temporais e leitura de placa
+  equipment_list.py        # Lista de equipamentos
+  equipment_form.py        # Cadastro / edição / ficha técnica
+  raw_data.py              # Dados brutos ADC → unidades de engenharia
+components/
+  cards.py                 # Componentes visuais reutilizáveis + paleta semântica
+services/
+  monitoring.py            # Orquestração do ciclo, trace_id, reconhecimento, feedback
+  alert_engine.py          # Modelo analítico (simulado) + contrato e validação
+  nlp_service.py           # Resumos e recomendações (templates, substituível por LLM)
+utils/
+  session.py               # Estado da sessão e dados de exemplo
+  theme.py                 # CSS / identidade Forzy
+tests/
+  test_services.py         # Testes automatizados (pytest)
+docs/
+  DOCUMENTACAO_FINAL.md    # Documentação da Sprint 4 (+ PDF e imagens)
+```
 
 ---
 
-*Desenvolvido para o desafio Forzy — uma empresa Promon.*
-*"for an easy tomorrow"*
+## 📈 Evolução por sprint
+
+| Sprint | Entregável |
+|---|---|
+| 1 | Cadastro técnico do ativo, lista, ficha técnica, dados brutos |
+| 2 | Dashboards de telemetria, séries temporais, navegação por plantas |
+| 3 | Painel de Alertas e Estados com modelo analítico simulado + NLP e apoio à decisão |
+| 4 | Consolidação: fonte única de alertas, página inicial correta, reconhecimento de alertas, feedback de IA, `trace_id`, erro amigável, testes e documentação final |
+
+---
+
+## 🎨 Design system
+
+| Token | Valor | Uso |
+|---|---|---|
+| `--orange` | `#FF6B00` | Cor primária, CTAs, TAGs |
+| `--purple` | `#3D1A6E` | Sidebar, títulos |
+| `--yellow` | `#F5C400` | Destaques |
+| `critico` | `#DC3545` | Estado crítico |
+| `atencao` | `#FFC107` | Estado de atenção |
+| `normal` | `#28A745` | Estado normal |
+
+Fontes: **Barlow Condensed** (títulos) + **Inter** (corpo).
+
+---
+
+*Desenvolvido para o desafio Forzy — uma empresa Promon. "for an easy tomorrow"*
