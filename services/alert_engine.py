@@ -10,8 +10,9 @@ Para plugar um modelo real (Sprint 4+), basta substituir o corpo de
 `detectar_anomalias()` por uma chamada ao modelo/API mantendo o mesmo contrato.
 """
 
-from datetime import datetime, timedelta
-import random
+import os
+import uuid
+from datetime import datetime
 
 CONTRATO_ALERTA = {
     "id":            "str  — identificador único do evento",
@@ -130,6 +131,11 @@ def detectar_anomalias(ciclo: int):
         novos_eventos: list[dict] no formato CONTRATO_ALERTA
         estados_atualizados: dict {tag: severidade}
     """
+    # Injeção de falha para demonstrar o tratamento amigável de erros (Sprint 4):
+    #   FORZY_SIMULAR_FALHA=1 streamlit run app.py
+    if os.environ.get("FORZY_SIMULAR_FALHA") == "1" and ciclo >= 1:
+        raise TimeoutError("modelo analítico indisponível (falha simulada)")
+
     idx = min(ciclo, len(CENARIOS) - 1)
     cenario = CENARIOS[idx]
 
@@ -137,7 +143,9 @@ def detectar_anomalias(ciclo: int):
     eventos = []
     for i, ev in enumerate(cenario["eventos"]):
         eventos.append({
-            "id": f"EVT-{agora.strftime('%H%M%S')}-{i}",
+            # Sprint 4: id único (antes era só HHMMSS-i e colidia ao clicar
+            # duas vezes no mesmo segundo, duplicando keys de botões).
+            "id": f"EVT-C{idx}-{agora.strftime('%H%M%S')}-{uuid.uuid4().hex[:6]}",
             "tag": ev["tag"],
             "severidade": ev["severidade"],
             "metrica": ev["metrica"],
@@ -152,6 +160,23 @@ def detectar_anomalias(ciclo: int):
         })
 
     return eventos, dict(cenario["estados"])
+
+
+CAMPOS_OBRIGATORIOS = ("id", "tag", "severidade", "metrica", "valor", "limite",
+                       "score_anomalia", "confianca", "timestamp", "modelo")
+SEVERIDADES = ("critico", "atencao", "normal")
+
+
+def validar_evento(evento: dict) -> list:
+    """Valida um evento contra o CONTRATO_ALERTA. Retorna a lista de problemas (vazia = ok)."""
+    problemas = [f"campo ausente: {c}" for c in CAMPOS_OBRIGATORIOS if c not in evento]
+    if evento.get("severidade") not in SEVERIDADES:
+        problemas.append(f"severidade inválida: {evento.get('severidade')!r}")
+    for campo in ("score_anomalia", "confianca"):
+        v = evento.get(campo)
+        if not isinstance(v, (int, float)) or not 0.0 <= v <= 1.0:
+            problemas.append(f"{campo} fora de 0..1: {v!r}")
+    return problemas
 
 
 def total_ciclos():
