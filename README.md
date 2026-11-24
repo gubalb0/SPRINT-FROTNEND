@@ -9,9 +9,10 @@
 | Integrante | RM |
 |---|---|
 | Gustavo Balbo Saraiva | 561711 |
-| Henry Gimenez | _______ |
-| Ian Nobres | _______ |
-| Matheus Mikio | _______ |
+| Henry Gimenez | 563217 |
+| Ian Nobres | 561681 |
+| Matheus Mikio | 561864 |
+| Vinícius Araújo | 564504 |
 
 ---
 
