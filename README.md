@@ -5,6 +5,7 @@
 > Challenge Forzy — disciplina de Front-End — FIAP, turma 2TIAPY.
 
 📄 **Documentação final (Sprint 4):** [`docs/DOCUMENTACAO_FINAL.md`](docs/DOCUMENTACAO_FINAL.md) · [PDF](docs/DOCUMENTACAO_FINAL.pdf)
+🎬 **Vídeo de demonstração (Sprint 3):** [`docs/video/sprint3_demo.mp4`](docs/video/sprint3_demo.mp4)
 
 | Integrante | RM |
 |---|---|

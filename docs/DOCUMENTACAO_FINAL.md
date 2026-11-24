@@ -26,6 +26,8 @@ O Forzy Motor Intelligence é uma interface web em **Streamlit + pandas + Plotly
 
 Este documento compara a versão entregue na Sprint 3 (commit `a3771ce`, 31/08/2026) com a versão final (Sprint 4), aponta os diferenciais e resultados, e registra o que ficou pendente com justificativa e próximos passos.
 
+**Vídeo de demonstração da Sprint 3 (ponto de partida, 5 min 20 s):** [`docs/video/sprint3_demo.mp4`](https://github.com/gubalb0/SPRINT-FROTNEND/blob/main/docs/video/sprint3_demo.mp4).
+
 Todos os prints "antes" foram capturados rodando o commit `a3771ce`; os prints "depois" foram capturados rodando a versão final, com o mesmo roteiro (abrir → 2× *Atualizar Análise* → navegar).
 
 ---
@@ -45,7 +47,7 @@ Ao revisar essa entrega para a apresentação final, encontramos problemas de in
 
 | # | Problema encontrado na Sprint 3 | Evidência |
 |---|---|---|
-| P1 | O commit `09b3602` ("integra painel de alertas à navegação como página inicial") não funcionava: `utils/session.py` definia `active_page = "dashboard"` antes do `app.py`, então o app abria no Dashboard. | Fig. 1 |
+| P1 | O commit `09b3602` ("integra painel de alertas à navegação como página inicial") não funcionava: `utils/session.py` definia `active_page = "dashboard"` antes do `app.py`, então o app abria no Dashboard. | Fig. 1; vídeo da Sprint 3 em 0:10 |
 | P2 | Três fontes de verdade para alertas. O Histórico e o banner do Dashboard liam `st.session_state.alertas`, uma lista **estática** criada na Sprint 2; o Painel lia o modelo. Resultado: o MTR-002 aparecia a **82 °C** no Histórico/Dashboard e a **84,3 °C** no Painel, com horários diferentes. | Fig. 3, Fig. 5 |
 | P3 | O ciclo de análise morava dentro da página do Painel. Quem abrisse outra página primeiro via estados que o modelo ainda não tinha calculado. | código |
 | P4 | `SAMPLE_EQUIPMENT.copy()` é cópia **rasa**: o painel alterava `eq["saude"]` nos dicionários do próprio módulo, vazando estado entre abas/sessões e impedindo o *Reiniciar Simulação* de voltar ao início. | código |
@@ -184,6 +186,8 @@ def executar_ciclo(state) -> dict:
 | Resumos e recomendações por NLP | `nlp_service.py` | Fig. 8, teste NLP |
 | Reconhecimento, feedback, `trace_id`, CSV | `monitoring.py`, `alerts.py` | Fig. 4, Fig. 8 |
 | Tratamento de erro | `operations_panel.py` | Fig. 9 |
+
+Evidência em vídeo: a demonstração completa da Sprint 3 está em [`docs/video/sprint3_demo.mp4`](https://github.com/gubalb0/SPRINT-FROTNEND/blob/main/docs/video/sprint3_demo.mp4). Os prints "depois" deste documento repetem o mesmo roteiro na versão final.
 
 Resultado dos testes automatizados:
 
