@@ -43,6 +43,8 @@ html, body, [class*="css"] {
     color: var(--white) !important;
 }
 
+/* Sprint 4: seletor de perfil legível no fundo roxo */
+[data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"], [data-testid="stSidebar"] [data-testid="stSelectbox"] [role="combobox"] *, [data-testid="stSidebar"] [data-baseweb="select"] * { color: #111 !important; -webkit-text-fill-color: #111 !important; opacity: 1 !important; }
 .sidebar-logo {
     padding: 8px 0 4px 0;
     text-align: left;

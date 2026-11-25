@@ -6,6 +6,8 @@ import streamlit as st
 from utils.session import init_session, reset_equipamentos
 from services import monitoring
 from utils.theme import inject_css
+from services import access, assistant
+from utils import version
 
 st.set_page_config(
     page_title="Forzy — Motor Intelligence",
@@ -26,6 +28,19 @@ with st.sidebar:
         '</div>',
         unsafe_allow_html=True,
     )
+    st.markdown("---")
+
+    # Sprint 4 (Governança): perfil do usuário. Em produção vem da claim `role`
+    # do token OIDC; aqui simula o login. A autorização é checada no roteador e nos serviços.
+    perfis = list(access.PERFIS)
+    perfil = st.selectbox("👤 Perfil (simula login OIDC)", perfis,
+                          index=perfis.index(st.session_state.get("perfil", "TECNICO")),
+                          format_func=lambda p: access.PERFIS[p], key="perfil_select")
+    if perfil != st.session_state.get("perfil"):
+        st.session_state.perfil = perfil
+        st.session_state.user_id = access.USUARIOS_DEMO[perfil]
+        st.session_state.chat_assistente = []   # não mostrar respostas dadas a outro perfil
+    st.caption(f"Usuário: {st.session_state.user_id}")
     st.markdown("---")
 
     # Badge de alertas críticos
@@ -66,12 +81,17 @@ with st.sidebar:
         "📋  Equipamentos":      "equipment_list",
         "➕  Cadastro":          "equipment_form",
         "🔢  Dados Brutos":      "raw_data",
+        "🤖  Assistente":        "assistant",
+        "🧾  Log de Auditoria":  "audit_log",
     }
 
     if "active_page" not in st.session_state:
         st.session_state.active_page = "operations_panel"
 
     for label, key in pages.items():
+        # Ocultar o botão é só conveniência visual; a autorização real está no roteador.
+        if not access.pode(st.session_state.perfil, access.PAGINA_RECURSO[key]):
+            continue
         if st.button(label, key=f"nav_{key}", use_container_width=True):
             st.session_state.active_page = key
             if key == "equipment_form":
@@ -89,12 +109,36 @@ with st.sidebar:
 
     st.markdown(
         '<p style="color:#888;font-size:11px;text-align:center;margin-top:8px;">'
-        'Motor Intelligence v4.0<br>Sprint 4 — Consolidação</p>',
+        f'Motor Intelligence v{version.PRODUTO}<br>Sprint 4 — Governança</p>',
         unsafe_allow_html=True,
     )
 
+# ── Cabeçalho: versão, changelog e Banner de Ruptura (gestão de mudanças) ────
+st.caption(version.linha_versao())
+with st.expander("📋 Changelog"):
+    for v, tipo, texto in version.CHANGELOG:
+        st.markdown(f"**v{v}** ({tipo}) — {texto}")
+st.warning("⚠️ " + version.BANNER_RUPTURA)
+if st.session_state.perfil in ("TECNICO", "GESTOR"):
+    ciencia = st.session_state.setdefault("ciencia_banner", set())
+    if st.session_state.user_id not in ciencia:
+        if st.button("Li e entendi a mudança", key="ciencia_banner_btn"):
+            assistant.registrar_ciencia_banner(st.session_state, st.session_state.perfil,
+                                               st.session_state.user_id, version.PRODUTO)
+            ciencia.add(st.session_state.user_id)
+            st.rerun()
+
 # ── Page Router ─────────────────────────────────────────────────────────────
 page = st.session_state.active_page
+
+# Autorização no back-end: vale mesmo se a página foi aberta antes da troca de perfil
+# ou se alguém manipular o estado da interface.
+try:
+    access.exigir(st.session_state.perfil, access.PAGINA_RECURSO.get(page, page))
+except access.AcessoNegado as erro:
+    st.error(f"🔒 Acesso negado. {erro} Recurso restrito a: "
+             f"{', '.join(access.perfis_com_acesso(access.PAGINA_RECURSO.get(page, page)))}.")
+    st.stop()
 
 if page == "operations_panel":
     from pages import operations_panel; operations_panel.render()
@@ -112,3 +156,7 @@ elif page == "equipment_form":
     from pages import equipment_form; equipment_form.render()
 elif page == "raw_data":
     from pages import raw_data; raw_data.render()
+elif page == "assistant":
+    from pages import assistant as assistant_page; assistant_page.render()
+elif page == "audit_log":
+    from pages import audit_log; audit_log.render()
