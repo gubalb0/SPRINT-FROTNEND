@@ -1,0 +1,29 @@
+# Metric Contract — Vibração (velocidade RMS)
+id: MTC-VIB-001
+version: 1.0.0
+status: vigente
+owner: Engenheiro de MLOps
+review_cycle: semestral
+metric:
+  name: vibracao_mms
+  description: Velocidade de vibração RMS no plano axial e radial do mancal
+  unit: "mm/s"
+  source: {sensor: IoT-v3, channel: ADC_VIB, sample_rate_hz: 1}
+  normative_reference: "ISO 10816-3, Classe II (15 kW a 75 kW)"
+baseline:
+  method: media_movel_30_dias_regime_estavel
+  recalculation: mensal
+bands:
+  normal:   {max: 4.5,             baseline_delta_pct_max: 15}
+  atencao:  {min: 4.5, max: 7.1,   baseline_delta_pct: [15, 30]}
+  alerta:   {min: 7.1, max: 11.0,  baseline_delta_pct: [30, 45]}
+  critico:  {min: 11.0,            baseline_delta_pct_min: 45}
+aggregation:
+  window_seconds: 60
+  outlier_rule: descartar_acima_de_3_desvios_padrao
+  min_valid_samples: 45
+  persistence: {windows: 3}
+actions:
+  atencao: registrar_log
+  alerta: notificar_tecnico
+  critico: abrir_ordem_de_servico

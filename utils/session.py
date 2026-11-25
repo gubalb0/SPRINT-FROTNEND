@@ -127,8 +127,12 @@ def gerar_historico(eq, horas=24, intervalo_min=10):
 
         noise = lambda v, p: v * (1 + random.gauss(0, p))
 
-        temp   = noise(75 * drift, 0.03)
-        vibracao = noise(5 * drift, 0.08)
+        # Sprint 4: simulação calibrada para os Metric Contracts
+        # (normal < 75 °C e < 4,5 mm/s; crítico chega acima de 95 °C e 11 mm/s).
+        extra_t = {"critico": 38, "atencao": 18}.get(saude, 0) * pct
+        extra_v = {"critico": 9.5, "atencao": 2.6}.get(saude, 0) * pct
+        temp   = noise(60 + extra_t, 0.02)
+        vibracao = noise(2.4 + extra_v, 0.06)
         corrente = noise(i_nom * (0.75 + 0.1 * drift), 0.04)
         rpm    = noise(rpm_nom * (1 - 0.02 * (drift - 1)), 0.01)
         tensao = noise(v_nom, 0.02)
@@ -163,6 +167,9 @@ def init_session():
         # Sprint 4: o Painel de Alertas passa a ser de fato a página inicial
         # (na Sprint 3 este valor era "dashboard" e sobrescrevia o app.py).
         st.session_state.active_page = "operations_panel"
+    if "perfil" not in st.session_state:
+        st.session_state.perfil = "TECNICO"
+        st.session_state.user_id = "tec.joao"
     if "form_mode" not in st.session_state:
         st.session_state.form_mode = "new"
     if "edit_data" not in st.session_state:

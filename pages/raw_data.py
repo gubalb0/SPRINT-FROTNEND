@@ -1,4 +1,6 @@
 import streamlit as st
+
+from services import contracts
 import random
 import math
 from datetime import datetime, timedelta
@@ -49,8 +51,8 @@ def _simulate_sensor_data(eq):
             "tensao_v":     (volts,   "V",     v_nom,    v_nom * 0.95, v_nom * 1.05),
             "corrente_a":   (amperes, "A",     i_nom,    0,            i_nom * 1.10),
             "rotacao_rpm":  (rpm,     "RPM",   rpm_nom,  rpm_nom*0.97, rpm_nom*1.03),
-            "temperatura_c":(temp_c,  "°C",    None,     0,            80),
-            "vibracao_mms": (vib_mms, "mm/s",  None,     0,            4.5),
+            "temperatura_c":(temp_c,  "°C",    None,     0,            contracts.faixas("temperatura_c")["atencao"]),
+            "vibracao_mms": (vib_mms, "mm/s",  None,     0,            contracts.faixas("vibracao_mms")["atencao"]),
             "potencia_kw":  (pot_kw,  "kW",    eq.get("potencia_kw", 0), 0, eq.get("potencia_kw", 0)*1.15),
         },
     }

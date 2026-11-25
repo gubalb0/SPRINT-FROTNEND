@@ -102,4 +102,4 @@ def test_reiniciar_limpa_simulacao():
 def test_nlp_resumo_cita_tag_valor_e_confianca():
     eventos, _ = alert_engine.detectar_anomalias(2)
     texto = nlp_service.resumir_evento(eventos[0], EQUIPS[1])
-    assert "MTR-002" in texto and "84.3" in texto and "94%" in texto
+    assert "MTR-002" in texto and "96.8" in texto and "94%" in texto

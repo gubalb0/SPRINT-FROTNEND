@@ -4,15 +4,31 @@ import plotly.express as px
 import pandas as pd
 from datetime import datetime
 
+from services import contracts, access
+
+# Sprint 4 (governança): temperatura e vibração vêm dos Metric Contracts em YAML.
+_TMP = contracts.faixas("temperatura_c")
+_VIB = contracts.faixas("vibracao_mms")
+
 
 LIMITES = {
-    "temperatura_c":  {"warn": 70, "crit": 80,  "unit": "°C",    "label": "Temperatura"},
-    "vibracao_mms":   {"warn": 2.8, "crit": 4.5, "unit": "mm/s", "label": "Vibração"},
+    "temperatura_c":  {"warn": _TMP["atencao"], "crit": _TMP["critico"], "unit": "°C", "label": "Temperatura"},
+    "vibracao_mms":   {"warn": _VIB["atencao"], "crit": _VIB["critico"], "unit": "mm/s", "label": "Vibração"},
     "corrente_a":     {"warn": None, "crit": None,"unit": "A",    "label": "Corrente"},
     "rotacao_rpm":    {"warn": None, "crit": None,"unit": "RPM",  "label": "Rotação"},
     "tensao_v":       {"warn": None, "crit": None,"unit": "V",    "label": "Tensão"},
     "potencia_kw":    {"warn": None, "crit": None,"unit": "kW",   "label": "Potência Ativa"},
 }
+
+
+def _render_resumo(ultimo):
+    """Visão 'Resumo' (Tabela 11): faixa de cada métrica, sem valores absolutos."""
+    rot = {"normal": "🟢 Normal", "atencao": "🟡 Atenção", "alerta": "🟠 Alerta", "critico": "🔴 Crítico"}
+    st.info("Perfil Gestor de Planta: telemetria exibida em resumo, sem valores absolutos (Tabela 11).")
+    c1, c2 = st.columns(2)
+    for col, met, nome in ((c1, "temperatura_c", "Temperatura"), (c2, "vibracao_mms", "Vibração")):
+        faixa = contracts.classificar(met, float(ultimo[met]))
+        col.metric(nome, rot[faixa], help=f"Faixa segundo {contracts.referencia(met)}")
 
 
 def _cor_valor(valor, lim_warn, lim_crit):
@@ -180,6 +196,14 @@ def render():
 
     ultimo = df.iloc[-1]
 
+    st.caption(f"Limiares de temperatura e vibração: {contracts.referencia('temperatura_c')} · "
+               f"{contracts.referencia('vibracao_mms')} (contracts/*.yaml)")
+
+    # Sprint 4 (governança): Gestor de Planta vê apenas o resumo (Tabela 11).
+    if access.nivel(st.session_state.get("perfil"), "telemetria_tempo_real") == "resumo":
+        _render_resumo(ultimo)
+        return
+
     # ── Gauges — Valores Atuais ────────────────────────────────
     st.markdown('<div class="section-divider"><span>Leitura Atual dos Sensores</span></div>', unsafe_allow_html=True)
 
@@ -189,9 +213,9 @@ def render():
     v_nom = eq.get("tensao_v", 380)
 
     with g1:
-        st.plotly_chart(_gauge(ultimo["temperatura_c"], "Temperatura", "°C", 120, 70, 80, "#FF6B00"), use_container_width=True)
+        st.plotly_chart(_gauge(ultimo["temperatura_c"], "Temperatura", "°C", 120, _TMP["atencao"], _TMP["critico"], "#FF6B00"), use_container_width=True)
     with g2:
-        st.plotly_chart(_gauge(ultimo["vibracao_mms"], "Vibração", "mm/s", 10, 2.8, 4.5, "#3D1A6E"), use_container_width=True)
+        st.plotly_chart(_gauge(ultimo["vibracao_mms"], "Vibração", "mm/s", 15, _VIB["atencao"], _VIB["critico"], "#3D1A6E"), use_container_width=True)
     with g3:
         cor_i, _ = _cor_valor(ultimo["corrente_a"], i_nom * 1.05, i_nom * 1.15)
         st.plotly_chart(_gauge(ultimo["corrente_a"], "Corrente", "A", i_nom * 1.5, i_nom * 1.05, i_nom * 1.15, cor_i), use_container_width=True)
@@ -212,9 +236,9 @@ def render():
     st.markdown("**Temperatura & Vibração** — indicadores primários de falha")
     t1, t2 = st.columns(2)
     with t1:
-        st.plotly_chart(_serie_temporal(df, "temperatura_c", "Temperatura", "°C", "#FF6B00", warn=70, crit=80), use_container_width=True)
+        st.plotly_chart(_serie_temporal(df, "temperatura_c", "Temperatura", "°C", "#FF6B00", warn=_TMP["atencao"], crit=_TMP["critico"]), use_container_width=True)
     with t2:
-        st.plotly_chart(_serie_temporal(df, "vibracao_mms", "Vibração", "mm/s", "#DC3545", warn=2.8, crit=4.5), use_container_width=True)
+        st.plotly_chart(_serie_temporal(df, "vibracao_mms", "Vibração", "mm/s", "#DC3545", warn=_VIB["atencao"], crit=_VIB["critico"]), use_container_width=True)
 
     st.markdown("**Elétricos** — corrente, tensão e potência")
     t3, t4, t5 = st.columns(3)

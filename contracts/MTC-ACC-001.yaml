@@ -1,0 +1,30 @@
+# Metric Contract — Aceleração de alta frequência
+id: MTC-ACC-001
+version: 1.0.0
+status: vigente
+owner: Engenheiro de MLOps
+review_cycle: semestral
+metric:
+  name: aceleracao_g
+  description: Aceleração de vibração em alta frequência (falha incipiente de rolamento)
+  unit: "g RMS"
+  source: {sensor: IoT-v3, channel: acelerometro_triaxial, band_hz: [500, 10000]}
+  normative_reference: "ISO 13373-2, análise de envelope"
+baseline:
+  method: percentil_95_primeiros_90_dias
+  reset_on: [instalacao, manutencao]
+bands:
+  normal:   {max: 2.0,            baseline_delta_pct_max: 20}
+  atencao:  {min: 2.0, max: 4.0,  baseline_delta_pct: [20, 50]}
+  alerta:   {min: 4.0, max: 6.5,  baseline_delta_pct: [50, 80]}
+  critico:  {min: 6.5,            baseline_delta_pct_min: 80}
+aggregation:
+  window_seconds: 30
+  fft_every_minutes: 5
+  min_valid_samples: 24
+  persistence: {windows: 4}
+correlation_rule: "elevação isolada sem vibração ou temperatura = suspeita, revisão humana"
+actions:
+  atencao: registrar_log
+  alerta: notificar_tecnico
+  critico: recomendar_analise_espectral
