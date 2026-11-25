@@ -1,0 +1,37 @@
+# Metric Contract — Temperatura de carcaça
+# Fonte governada dos limiares exibidos no painel (pages/telemetry.py lê este arquivo).
+# Versionamento semântico: MAJOR = muda interpretação (faixa, unidade, janela);
+# MINOR = nova cláusula compatível; PATCH = correção de texto/metadado.
+id: MTC-TMP-001
+version: 1.1.0
+status: vigente
+owner: Engenheiro de MLOps
+review_cycle: semestral
+metric:
+  name: temperatura_c
+  description: Temperatura de superfície da carcaça, junto ao mancal dianteiro
+  unit: "°C"
+  source: {sensor: IoT-v3, channel: ADC_T, sample_rate_hz: 1}
+  normative_reference: "Classe de isolamento F (155 °C) com margem de segurança de 50%"
+baseline:
+  method: media_regime_permanente_carga_nominal
+  measured_at: comissionamento
+bands:            # absoluto OU desvio em relação ao baseline do ativo
+  normal:   {max: 75,           baseline_delta_max: 8}
+  atencao:  {min: 75, max: 85,  baseline_delta: [8, 15]}
+  alerta:   {min: 85, max: 95,  baseline_delta: [15, 25]}
+  critico:  {min: 95,           baseline_delta_min: 25}
+aggregation:
+  window_seconds: 300
+  min_valid_samples: 240
+  persistence: {windows: 2, critical_single_window: true}
+  ambient_correction: {apply_when_ambient_above_c: 30}
+plausibility:     # adicionado na v1.1.0 (ação do postmortem PM-2026-001)
+  invalid_if_below_c: 5
+  invalid_if_below_ambient_by_c: 5
+  stuck_value: {zero_variance_minutes: 10}
+  on_invalid: amostra_invalida_conta_para_circuit_breaker
+actions:
+  atencao: registrar_log
+  alerta: [notificar_tecnico, notificar_gestor]
+  critico: [alarme, abrir_ordem_de_servico]
