@@ -6,6 +6,7 @@
 
 📄 **Documentação final (Sprint 4):** [`docs/DOCUMENTACAO_FINAL.md`](docs/DOCUMENTACAO_FINAL.md) · [PDF](docs/DOCUMENTACAO_FINAL.pdf)
 🛡️ **Governança (Sprint 4 — GBA):** [`docs/governanca/README.md`](docs/governanca/README.md) · Metric Contracts em [`contracts/`](contracts/)
+🎥 **Vídeo de defesa (Sprint 4 — GBA):** [youtu.be/VGVsrNhTpp0](https://youtu.be/VGVsrNhTpp0)
 🎬 **Vídeo de demonstração (Sprint 3):** [`docs/video/sprint3_demo.mp4`](docs/video/sprint3_demo.mp4)
 
 | Integrante | RM |
